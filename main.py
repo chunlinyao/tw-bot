@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, logging
+import sys, logging, traceback
 
 sys.path.insert(0, 'lib')
 
@@ -52,13 +52,15 @@ class TwSession(object):
     def __init__(self, user):
         self.logged = False
         self.user = user
-        self.twapi = None
         self.twuser = ""
         self.twpass = ""
         self.followers = []
         self.following = []
 
-
+    @property
+    def twapi(self):
+        return twitter.Api(self.twuser, self.twpass)
+        
     def handle(self, message=None):
         if message.command:
             handler_name = "%s_command" %(message.command,)
@@ -67,6 +69,13 @@ class TwSession(object):
                 handler(message)
                 return True
         return False
+
+    def t_command(self, message = None):
+        return self.timeline_command(message)
+    def p_command(self, message = None):
+        return self.post_command(message)
+    def ft_command(self, message = None):
+        return self.ftimeline_command(message)
 
     @updatecache
     def login_command(self, message=None):
@@ -78,12 +87,12 @@ class TwSession(object):
             message.reply("You are already logged on twitter./disconnect fist.")
             return 
         self.twuser,self.twpass = message.arg.split()
-        self.twapi = twitter.Api(self.twuser, self.twpass)
         try:
             self.followers = self.twapi.GetFollowers()
             self.logged = True
             message.reply(":)Connected. ")
         except:
+            logging.exception(message.command)
             message.reply(":( Could not connect to your twitter")
 
     @checklogin
@@ -96,6 +105,7 @@ class TwSession(object):
             self.twapi.PostUpdate(msg)
             message.reply(":) Success")
         except:
+            logging.exception(message.command)
             message.reply(":( Post Error")
 
     @checklogin
@@ -107,6 +117,7 @@ class TwSession(object):
                 rstr += people.name + "(" + people.screen_name + "), "
             message.reply(rstr)
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
     @checklogin
@@ -115,10 +126,11 @@ class TwSession(object):
             self.following = self.twapi.GetFriends()
 
             rstr = "People you are following:\n"
-            for people in self.followers:
+            for people in self.following:
                 rstr += people.name + "(" + people.screen_name + "), "
             message.reply(rstr[:-2])
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
     @checklogin
@@ -132,6 +144,7 @@ class TwSession(object):
             self.twapi.PostDirectMessage(friend, msg)
             message.reply(":) Message posted!")
         except:
+            logging.exception(message.command)
             message.reply(":( Post error.")
 
     @checklogin
@@ -142,6 +155,7 @@ class TwSession(object):
             self.twapi.CreateFriendship(message.arg)
             message.reply(":) Now you are follow " + message.arg)
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
 
@@ -153,13 +167,14 @@ class TwSession(object):
             self.twapi.DestroyFriendship(message.arg)
             message.reply(":) Now you are not follow " + message.arg)
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
     @checklogin
     def timeline_command(self, message=None):
         argc = len(message.arg.split())
-        count = 50
-        user = None
+        count = 20
+        user = self.twuser
 
         if argc >=1:
             user = message.arg.split()[0]
@@ -178,14 +193,15 @@ class TwSession(object):
                 + "\n----------------------------\n")
                 message.reply(rstr)
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
 
     @checklogin
     def ftimeline_command(self, message=None):
         argc = len(message.arg.split())
-        count = 50
-        user = None
+        count = 20
+        user = self.twuser
 
         if argc >=1:
             user = message.arg.split()[0]
@@ -204,6 +220,7 @@ class TwSession(object):
                 "\n----------------------------\n")
                 message.reply(rstr)
         except:
+            logging.exception(message.command)
             message.reply(":( Error")
 
     @checklogin
