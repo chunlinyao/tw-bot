@@ -1,5 +1,5 @@
 application: tw-bot
-version: 1
+version: pub
 runtime: python
 api_version: 1
 

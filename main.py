@@ -14,22 +14,6 @@ from google.appengine.ext.webapp import xmpp_handlers
 from google.appengine.api import memcache
 
 VERSION="1"
-USAGE="""
-/help usage
-/version 
-/time
-/date
-/login
-/post
-/followers
-/following
-/dmsg
-/follow
-/unfollow
-/timeline
-/ftimeline
-/logout
-"""
 
 def checklogin(method):
     def wrapper(self, *args, **kwargs):
@@ -37,6 +21,7 @@ def checklogin(method):
             message.reply("You are not connected on twitter, /login username password")
         else:
             return method(self, *args, **kwargs)
+    wrapper.__doc__ = method.__doc__
     return wrapper
 
 
@@ -45,6 +30,7 @@ def updatecache(method):
         ret = method(self, *args, **kwargs)
         memcache.set(self.user, self)
         return ret
+    wrapper.__doc__ = method.__doc__
     return wrapper
 
 class TwSession(object):
@@ -71,15 +57,22 @@ class TwSession(object):
         return False
 
     def t_command(self, message = None):
+        """/t 
+        alias of /timeline"""
         return self.timeline_command(message)
     def p_command(self, message = None):
+        """/p
+        alias of /post"""
         return self.post_command(message)
     def ft_command(self, message = None):
+        """/ft 
+        alias of /ftimeline"""
         return self.ftimeline_command(message)
 
     @updatecache
     def login_command(self, message=None):
-        """user login"""
+        """/login <username> <password> 
+        *use basic authentication*"""
         if len(message.arg.split()) != 2:
             message.reply("/login username password\n")
             return 
@@ -97,6 +90,8 @@ class TwSession(object):
 
     @checklogin
     def post_command(self, message=None):
+        """/post <message> 
+        post to twitter"""
         if len(message.arg)== 0:
             message.reply("require message body")
             return True
@@ -110,6 +105,8 @@ class TwSession(object):
 
     @checklogin
     def followers_command(self, message=None):
+        """/followers 
+        show who are following you."""
         try:
             self.followers = self.twapi.GetFollowers()
             rstr = "People who are following you:\n"
@@ -122,6 +119,8 @@ class TwSession(object):
 
     @checklogin
     def following_command(self, message=None):
+        """/following 
+        show people you are following."""
         try:
             self.following = self.twapi.GetFriends()
 
@@ -135,6 +134,8 @@ class TwSession(object):
 
     @checklogin
     def dmsg_command(self, message=None):
+        """/dmsg <friend> <message> 
+        send direct message."""
         if len(message.arg.split()) < 2:
             message.reply("/dmsg friend message")
             return
@@ -149,8 +150,10 @@ class TwSession(object):
 
     @checklogin
     def follow_command(self, message=None):
+        """/follow <username> 
+        follow someone."""
         if len(message.arg) < 1:
-            message.reply("/follow usernaame")
+            message.reply("/follow username")
         try:
             self.twapi.CreateFriendship(message.arg)
             message.reply(":) Now you are follow " + message.arg)
@@ -161,8 +164,10 @@ class TwSession(object):
 
     @checklogin
     def unfollow_command(self, message=None):
+        """/unfollow <username> 
+        unfollow someone."""
         if len(message.arg) < 1:
-            message.reply("/unfollow usernaame")
+            message.reply("/unfollow username")
         try:
             self.twapi.DestroyFriendship(message.arg)
             message.reply(":) Now you are not follow " + message.arg)
@@ -172,6 +177,8 @@ class TwSession(object):
 
     @checklogin
     def timeline_command(self, message=None):
+        """/timeline [user] [count] 
+        show timeline."""
         argc = len(message.arg.split())
         count = 20
         user = self.twuser
@@ -191,7 +198,7 @@ class TwSession(object):
             for status in tline:
                 rstr += (status.user.screen_name + ": " + status.text 
                 + "\n----------------------------\n")
-                message.reply(rstr)
+            message.reply(rstr)
         except:
             logging.exception(message.command)
             message.reply(":( Error")
@@ -199,6 +206,8 @@ class TwSession(object):
 
     @checklogin
     def ftimeline_command(self, message=None):
+        """/ftimeline [user] [count] 
+        show friends timeline."""
         argc = len(message.arg.split())
         count = 20
         user = self.twuser
@@ -218,7 +227,7 @@ class TwSession(object):
             for status in tline:
                 rstr += (status.user.screen_name + ": " + status.text + 
                 "\n----------------------------\n")
-                message.reply(rstr)
+            message.reply(rstr)
         except:
             logging.exception(message.command)
             message.reply(":( Error")
@@ -226,6 +235,8 @@ class TwSession(object):
     @checklogin
     @updatecache
     def disconnect_command(self, message=None):
+        """/disconnect
+        logout."""
         del(self.twapi)
         self.logged = False
         message.reply(":) Disconnected.")
@@ -248,17 +259,33 @@ class XmppHandler(xmpp_handlers.CommandHandler):
         self.help_command(message)
 
     def help_command(self, message=None):
-        """Handles /help requests, Show usage."""
-        message.reply(USAGE)
+        """/help 
+        show usage."""
+        rstr = "\n"
+        for k,v in XmppHandler.__dict__.items():
+            if k.endswith("command") and k != "unhandled_command":
+                rstr+= v.__doc__
+                rstr+= "\n"
+        for k,v in TwSession.__dict__.items():
+            if k.endswith("command") and k != "unhandled_command":
+                rstr+= v.__doc__
+                rstr+= "\n"
+        message.reply(rstr)
     
     def version_command(self, message=None):
+        """/version
+        show version number."""
         message.reply("tw-bot Version: %s" % (VERSION,))
 
     def time_command(self, message=None):
+        """/time
+        show server time."""
         today = datetime.datetime.now()
         message.reply(today.strftime("%H:%M:%S"))
 
     def date_command(self, message=None):
+        """/date
+        show server date."""
         today = datetime.datetime.now()
         message.reply(today.ctime())
 
