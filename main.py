@@ -274,6 +274,7 @@ class TwSession(object):
                     count = int(message.arg.split()[0])
                 except:
                     message.reply(":( you need to pass a integer argument to count./timeline user count")
+                    logging.exception(message.command)
                     return
 
         rstr = "\n"
@@ -383,7 +384,7 @@ class OAuthHandler(RequestHandler):
         request_token = OAuthToken.findby_request_token(oauth_token)
         if request_token is None:
             # We do not seem to have this request token, show an error.
-            self.Render("error.html", msg='Missing required parameters!')
+            self.Render("error.html", msg='Request token not found.')
             return
  
         # Rebuild the auth handler
