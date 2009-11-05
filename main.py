@@ -48,8 +48,6 @@ class TwSession(object):
         self.following = []
         self.oauthtoken = OAuthToken.getOAuthToken(user)
         self.auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        logging.info(self.user)
-        logging.info(self.oauthtoken.__dict__)
         if self.oauthtoken.access_token:
             self.auth.set_access_token(self.oauthtoken.access_token,self.oauthtoken.access_token_secret)
             self.logged = True
@@ -74,7 +72,7 @@ class TwSession(object):
     def oauth_command(self, message = None):
         """
         */oauth*
-        use oauth to login """
+        use oauth to login 需要翻墙"""
         try:
             login_url = self.auth.get_authorization_url()
             self.oauthtoken.update_request_token(self.auth.request_token.key,self.auth.request_token.secret)
@@ -83,6 +81,45 @@ class TwSession(object):
             return
         message.reply("Use this url to login.")
         message.reply(login_url)
+        return 
+
+    def oauthchina_command(self, message = None):
+        """
+        */oauthchina username password*
+        use oauth to login 不用翻墙,但是要提供用户名密码，本软件不保存密码。"""
+        if len(message.arg.split()) < 2:
+            message.reply("/oauthchina username password")
+            return
+        username = message.arg.split()[0]
+        password = message.arg.split()[1]
+        try:
+            login_url = self.auth.get_authorization_url()
+            self.oauthtoken.update_request_token(self.auth.request_token.key,self.auth.request_token.secret)
+        except tweepy.TweepError:
+            message.reply("Error! Failed to get request token.")
+            return
+        message.reply("try to login...")
+        import urllib2,urllib,re
+        c = urllib2.HTTPCookieProcessor()
+        redirect_handler= urllib2.HTTPRedirectHandler()
+        op = urllib2.build_opener(redirect_handler,c)
+        try:
+            response = op.open(login_url)
+            r = re.compile('<input.*name="authenticity_token".*value="(.*)"')
+            authenticity_token = r.findall(response.read())[0]
+            data = {"authenticity_tokeh":authenticity_token,
+                    "oauth_token": self.auth.request_token.key,
+                    "session[password]":password,
+                    "session[username_or_email]":username
+                    }
+            resp = op.open("http://twitter.com/oauth/authorize", urllib.urlencode(data))
+            if resp.code != 200:
+                message.reply("login error.")
+            resp = op.open("http://tw-bot.appspot.com/oauth?oauth_token=%s" % (self.auth.request_token.key,))
+            return
+        except:
+            message.reply("cannot connect to server.")
+            logging.exception("cannot connect to server.")
         return 
 
     def t_command(self, message = None):
@@ -217,7 +254,7 @@ class TwSession(object):
             tline = self.twapi.user_timeline(user, count=count)
             for status in tline:
                 rstr += (status.user.screen_name + ": " + status.text 
-                + "\n----------------------------\n")
+                + "\n----\n")
             message.reply(rstr)
         except:
             logging.exception(message.command)
@@ -244,7 +281,7 @@ class TwSession(object):
             tline = self.twapi.friends_timeline(count=count)
             for status in tline:
                 rstr += (status.user.screen_name + ": " + status.text + 
-                "\n----------------------------\n")
+                "\n----\n")
             message.reply(rstr)
         except:
             logging.exception(message.command)
