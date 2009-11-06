@@ -326,7 +326,7 @@ class XmppHandler(xmpp_handlers.CommandHandler):
         user = message.sender
         if user.find("/") > -1:
             user = user[:user.find("/")]
-        session = self.getTwSession(user)
+        session = getTwSession(user)
         if session.handle(message=message):
             return
         self.help_command(message=message)
