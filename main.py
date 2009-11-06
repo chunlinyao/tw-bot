@@ -4,7 +4,7 @@ import sys, logging, traceback
 
 sys.path.insert(0, 'lib')
 
-import os, datetime, tweepy
+import os, datetime, tweepy 
 import wsgiref.handlers
 
 from google.appengine.ext import webapp
@@ -16,10 +16,6 @@ from google.appengine.api.xmpp import *
 from model import * 
 
 VERSION="1"
-
-
-CONSUMER_KEY=AppKey.getAppKey().consumer_key
-CONSUMER_SECRET=AppKey.getAppKey().consumer_secret
 
 def checklogin(method):
     def wrapper(self, *args, **kwargs):
@@ -47,7 +43,8 @@ class TwSession(object):
         self.followers = []
         self.following = []
         self.oauthtoken = OAuthToken.getOAuthToken(user)
-        self.auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        self.auth = tweepy.OAuthHandler(AppKey.getAppKey().consumer_key, AppKey.getAppKey().consumer_secret)
+        self.last_fetch = None
         if self.oauthtoken.access_token:
             self.auth.set_access_token(self.oauthtoken.access_token,self.oauthtoken.access_token_secret)
             self.logged = True
@@ -262,12 +259,13 @@ class TwSession(object):
 
 
     @checklogin
-    def ftimeline_command(self, message=None):
+    @updatecache
+    def ftimeline_command(self, message=None, taskqueue=False):
         """
         */ftimeline [count]*
-        show friends timeline.  """
+        show friends timeline. call this command without count will fetch new items after last fetch  """
         argc = len(message.arg.split())
-        count = 20
+        count = None
 
         if argc >=1:
                 try:
@@ -276,14 +274,25 @@ class TwSession(object):
                     message.reply(":( you need to pass a integer argument to count./timeline user count")
                     logging.exception(message.command)
                     return
-
+        
         rstr = "\n"
         try:
-            tline = self.twapi.friends_timeline(count=count)
-            for status in tline:
-                rstr += (status.user.screen_name + ": " + status.text + 
-                "\n----\n")
-            message.reply(rstr)
+            if count is None:
+                if self.last_fetch is None:
+                    tline = self.twapi.friends_timeline()
+                else:
+                    tline = self.twapi.friends_timeline(since_id=self.last_fetch)
+            else:
+                tline = self.twapi.friends_timeline(count=count)
+            if len(tline) > 0:
+                self.last_fetch=tline[0].id
+                for status in tline:
+                    rstr += (status.user.screen_name + ": " + status.text + 
+                    "\n----\n")
+                message.reply(rstr)
+            else:
+                if not taskqueue:
+                    message.reply(":) No new items.")
         except:
             logging.exception(message.command)
             message.reply(":( Error")
@@ -292,6 +301,20 @@ try:
     users_list
 except NameError:
     users_list = {}
+
+def getTwSession(user):
+    twsession = None
+    if not users_list.has_key(user):
+        #load from memcache
+        twsession = memcache.get(user)
+        if twsession is None:
+            if not user == None:
+                twsession = TwSession(user)
+                memcache.set(user, twsession)
+        users_list[user]=twsession
+    else:
+        twsession = users_list[user]
+    return twsession
 
 class XmppHandler(xmpp_handlers.CommandHandler):
     """Handler class for all XMPP activity."""
@@ -343,21 +366,6 @@ class XmppHandler(xmpp_handlers.CommandHandler):
         today = datetime.datetime.now()
         message.reply(today.ctime())
 
-    def getTwSession(self, user):
-        twsession = None
-        if not users_list.has_key(user):
-            #load from memcache
-            twsession = memcache.get(user)
-            if twsession is None:
-                if not user == None:
-                    twsession = TwSession(user)
-                    memcache.set(user, twsession)
-            users_list[user]=twsession
-        else:
-            twsession = users_list[user]
-        return twsession
-
-
 
 class Home(webapp.RequestHandler):
     def Render(self, template_file, template_values):
@@ -388,7 +396,7 @@ class OAuthHandler(RequestHandler):
             return
  
         # Rebuild the auth handler
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth = tweepy.OAuthHandler(AppKey.getAppKey().consumer_key, AppKey.getAppKey().consumer_secret)
         auth.set_request_token(request_token.request_token, request_token.request_token_secret)
  
         # Fetch the access token
@@ -411,14 +419,37 @@ class ClearCache(RequestHandler):
         print "Memcache flushed." 
         return
 
+from google.appengine.api.labs import taskqueue
+
+class CronHandler(RequestHandler):
+    def get(self):
+        for user in OAuthToken.all():
+            if get_presence(user.jid):
+                taskqueue.add(params={'jid': user.jid})
+        self.redirect('/')
+
+class QueueHandler(RequestHandler):
+    def post(self):
+        jid = self.request.get("jid", None)
+        if jid:
+            if get_presence(jid):
+                twsession = getTwSession(jid)
+                if twsession:
+                    message = Message({"from":jid, "to":"tw-bot@appspot.com", "body":"/ft"})
+                    twsession.ftimeline_command(message=message, taskqueue=True)
+                    return
+        self.error(500)
+
 def application():
     application = webapp.WSGIApplication([
         ('/',Home),
         ('/index.html',Home),
         ('/index.htm',Home),
         ('/_ah/xmpp/message/chat/', XmppHandler),
+        ('/_ah/queue/default', QueueHandler),
         ('/oauth', OAuthHandler),
         ('/clearcache', ClearCache),
+        ('/tasks/timeline', CronHandler),
         ], debug=True)
     return application
 
