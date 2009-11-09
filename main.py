@@ -297,6 +297,52 @@ class TwSession(object):
             logging.exception(message.command)
             message.reply(":( Error")
 
+    @checklogin
+    def mentions_command(self, message=None):
+        """
+        */metions [count]*
+        show metions.  """
+        argc = len(message.arg.split())
+        count = 20
+        if argc >=1:
+            try:
+                count = int(message.arg.split()[0])
+            except:
+                message.reply(":( you need to pass a integer argument to count./timeline user count")
+                return
+
+        rstr = "\n"
+        try:
+            tline = self.twapi.mentions(count=count)
+            if len(tline) > 0:
+                for status in tline:
+                    rstr += (status.user.screen_name + ": " + status.text 
+                    + "\n----\n")
+                message.reply(rstr)
+            else:
+                message.reply("Nobody metions you.")
+        except:
+            logging.exception(message.command)
+            message.reply(":( Error")
+
+    @checklogin
+    def search_command(self, message=None):
+        """
+        */search query*
+        search.  """
+        import urllib
+        q=urllib.urlencode([("",message.arg.encode('utf-8'))])[1:]
+        rstr="\n"
+        try:
+            result = self.twapi.search(q=q)
+            for item in result:
+                rstr += (item.from_user + ": " + item.text + "\n")
+                rstr += (item.source
+                + "\n----\n")
+            message.reply(rstr)
+        except:
+            logging.exception(message.command)
+            message.reply(sys.exc_info()[1])
 try:
     users_list
 except NameError:
