@@ -17,33 +17,8 @@ class Model(object):
             pickle[k] = v
         return pickle
 
-    @staticmethod
-    def _validate(model, attributes):
-        missing = []
-        for attr in attributes:
-            if not hasattr(model, attr):
-                missing.append(attr)
-        if len(missing) > 0:
-            raise TweepError('Missing required attribute(s) %s' % \
-                                str(missing).strip('[]'))
-
-    def validate(self):
-        return
-
 
 class Status(Model):
-
-    @staticmethod
-    def _validate(status):
-        Model._validate(status, [
-          'created_at', 'id', 'text', 'source', 'truncated', 'in_reply_to_status_id',
-          'in_reply_to_user_id', 'favorited', 'in_reply_to_screen_name'
-        ])
-        if hasattr(status, 'user'):
-            User._validate(status.user)
-
-    def validate(self):
-        Status._validate(self)
 
     def destroy(self):
         return self._api.destroy_status(self.id)
@@ -59,23 +34,6 @@ class Status(Model):
 
 
 class User(Model):
-
-    @staticmethod
-    def _validate(user):
-        Model._validate(user, [
-            'id', 'name', 'screen_name', 'location', 'description', 'profile_image_url',
-            'url', 'protected', 'followers_count', 'profile_background_color',
-            'profile_text_color', 'profile_sidebar_fill_color',
-            'profile_sidebar_border_color', 'friends_count', 'created_at',
-            'favourites_count', 'utc_offset', 'time_zone',
-            'profile_background_image_url', 'statuses_count',
-            'notifications', 'following', 'verified'
-        ])
-        if hasattr(user, 'status'):
-            Status._validate(user.status)
-
-    def validate(self):
-        User._validate(self)
 
     def timeline(self, **kargs):
         return self._api.user_timeline(**kargs)
@@ -101,7 +59,7 @@ class User(Model):
 class DirectMessage(Model):
 
     def destroy(self):
-        return self._api.destroy_direct_message(id=self.id)
+        return self._api.destroy_direct_message(self.id)
 
 
 class Friendship(Model):
@@ -111,7 +69,8 @@ class Friendship(Model):
 
 class SavedSearch(Model):
 
-    pass
+    def destroy(self):
+        return self._api.destroy_saved_search(self.id)
 
 
 class SearchResult(Model):
@@ -120,7 +79,13 @@ class SearchResult(Model):
 
 class Retweet(Model):
 
-    pass
+    def destroy(self):
+        return self._api.destroy_status(self.id)
+
+class List(Model):
+
+    def destroy(self):
+        return self._api.destroy_list(self.slug)
 
 # link up default model implementations.
 models = {
@@ -131,5 +96,6 @@ models = {
     'saved_search': SavedSearch,
     'search_result': SearchResult,
     'retweet': Retweet,
+    'list': List,
 }
 

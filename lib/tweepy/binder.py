@@ -22,11 +22,11 @@ except ImportError:
 
 
 def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
-              timeout=None, host=None):
+              timeout=None, search_api = False):
 
     def _call(api, *args, **kargs):
         # If require auth, throw exception if credentials not provided
-        if require_auth and not api.auth_handler:
+        if require_auth and not api.auth:
             raise TweepError('Authentication required!')
 
         # check for post data
@@ -66,10 +66,15 @@ def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
             parameters = None
 
         # Build url with parameters
-        if parameters:
-            url = '%s?%s' % (api.api_root + path, urllib.urlencode(parameters))
+        if search_api is False:
+            api_root = api.api_root
         else:
-            url = api.api_root + path
+            api_root = api.search_root
+
+        if parameters:
+            url = '%s?%s' % (api_root + path, urllib.urlencode(parameters))
+        else:
+            url = api_root + path
 
         # Check cache if caching enabled and method is GET
         if api.cache and method == 'GET':
@@ -89,7 +94,10 @@ def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
             scheme = 'https://'
         else:
             scheme = 'http://'
-        _host = host or api.host
+        if search_api is False:
+            host = api.host
+        else:
+            host = api.search_host
 
         # Continue attempting request until successful
         # or maximum number of retries is reached.
@@ -98,14 +106,14 @@ def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
             # Open connection
             # FIXME: add timeout
             if api.secure:
-                conn = httplib.HTTPSConnection(_host)
+                conn = httplib.HTTPSConnection(host)
             else:
-                conn = httplib.HTTPConnection(_host)
+                conn = httplib.HTTPConnection(host)
 
             # Apply authentication
-            if api.auth_handler:
-                api.auth_handler.apply_auth(
-                        scheme + _host + url,
+            if api.auth:
+                api.auth.apply_auth(
+                        scheme + host + url,
                         method, headers, parameters
                 )
 
@@ -153,7 +161,7 @@ def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
 
         # Pass json object into parser
         try:
-            if next_cursor is not None and prev_cursor is not None:
+            if parameters and 'cursor' in parameters:
                 out = parser(jobject, api), next_cursor, prev_cursor
             else:
                 out = parser(jobject, api)
@@ -161,18 +169,6 @@ def bind_api(path, parser, allowed_param=[], method='GET', require_auth=False,
             raise TweepError("Failed to parse response: %s" % e)
 
         conn.close()
-
-        # validate result
-        if api.validate:
-            # list of results
-            if isinstance(out, list) and len(out) > 0:
-                if hasattr(out[0], 'validate'):
-                    for result in out:
-                        result.validate()
-            # single result
-            else:
-                if hasattr(out, 'validate'):
-                    out.validate()
 
         # store result in cache
         if api.cache and method == 'GET':
