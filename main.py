@@ -343,6 +343,19 @@ class TwSession(object):
         except:
             logging.exception(message.command)
             message.reply(sys.exc_info()[1])
+    
+    @checklogin
+    def quit_command(self, message=None):
+        """
+        */quit*
+        logoff  """
+        try:
+            self.oauthtoken.update_access_token("", "")
+            memcache.delete(self.user)
+            message.reply(":) Good Bye.")
+        except:
+            logging.exception(message.command)
+            message.reply(sys.exc_info()[1])
 try:
     users_list
 except NameError:
