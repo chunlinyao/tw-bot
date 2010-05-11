@@ -285,10 +285,13 @@ class TwSession(object):
             else:
                 tline = self.twapi.friends_timeline(count=count)
             if len(tline) > 0:
+                lastId = self.last_fetch
                 self.last_fetch=tline[0].id
+                tline.reverse()
                 for status in tline:
-                    rstr += (status.user.screen_name + ": " + status.text + 
-                    "\n----\n")
+                    if lastId < status.id:
+                        rstr += (status.user.screen_name + ": " + status.text + 
+                        "\n----\n")
                 message.reply(rstr)
             else:
                 if not taskqueue:
