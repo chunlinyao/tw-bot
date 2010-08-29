@@ -30,6 +30,7 @@ class OAuthToken(db.Model):
     access_token = db.StringProperty()
     access_token_secret = db.StringProperty()
     created = db.DateTimeProperty(auto_now_add=True)
+    last_fetch = db.IntegerProperty()
  
     @staticmethod
     def getOAuthToken(jid):

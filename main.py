@@ -44,7 +44,7 @@ class TwSession(object):
         self.following = []
         self.oauthtoken = OAuthToken.getOAuthToken(user)
         self.auth = tweepy.OAuthHandler(AppKey.getAppKey().consumer_key, AppKey.getAppKey().consumer_secret)
-        self.last_fetch = None
+        self.last_fetch = self.oauthtoken.last_fetch
         if self.oauthtoken.access_token:
             self.auth.set_access_token(self.oauthtoken.access_token,self.oauthtoken.access_token_secret)
             self.logged = True
@@ -287,6 +287,8 @@ class TwSession(object):
             if len(tline) > 0:
                 lastId = self.last_fetch
                 self.last_fetch=tline[0].id
+                self.oauthtoken.last_fetch = self.last_fetch
+                self.oauthtoken.put()
                 tline.reverse()
                 for status in tline:
                     if lastId < status.id:
