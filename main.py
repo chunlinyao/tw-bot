@@ -35,6 +35,11 @@ def updatecache(method):
     wrapper.__doc__ = method.__doc__
     return wrapper
 
+try:
+    users_list
+except NameError:
+    users_list = {}
+
 class TwSession(object):
     """twitter session"""
     def __init__(self, user):
@@ -357,17 +362,16 @@ class TwSession(object):
         try:
             self.oauthtoken.update_access_token("", "")
             memcache.delete(self.user)
+            global users_list
+            del users_list[self.user]
             message.reply(":) Good Bye.")
         except:
             logging.exception(message.command)
             message.reply(sys.exc_info()[1])
-try:
-    users_list
-except NameError:
-    users_list = {}
 
 def getTwSession(user):
     twsession = None
+    global users_list
     if not users_list.has_key(user):
         #load from memcache
         twsession = memcache.get(user)
@@ -473,6 +477,8 @@ class OAuthHandler(RequestHandler):
  
         request_token.update_access_token(auth.access_token.key, auth.access_token.secret)
         memcache.delete(request_token.jid)
+        global users_list
+        del users_list[request_token.jid]
         send_message(request_token.jid, ":) Success")
         self.Render("success.html")
 
