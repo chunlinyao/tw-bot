@@ -53,9 +53,12 @@ class TwSession(object):
         if self.oauthtoken.access_token:
             self.auth.set_access_token(self.oauthtoken.access_token,self.oauthtoken.access_token_secret)
             self.logged = True
-            self.twuser = self.twapi.me().screen_name
-        
-
+            try:
+                self.twuser = self.twapi.me().screen_name
+            except tweepy.TweepError, e:
+                logging.exception(e)
+                if e.reason == "Unable to get username, invalid oauth token!":
+                    self.quit_command()
     @property
     def twapi(self):
         return tweepy.API(self.auth) if self.logged else tweepy.api
@@ -494,20 +497,28 @@ from google.appengine.api.labs import taskqueue
 class CronHandler(RequestHandler):
     def get(self):
         for user in OAuthToken.all():
-            if get_presence(user.jid):
-                taskqueue.add(params={'jid': user.jid})
+            try:
+                if get_presence(user.jid):
+                    taskqueue.add(params={'jid': user.jid})
+            except e:
+                logging.exception(e)
+                return
         self.redirect('/')
 
 class QueueHandler(RequestHandler):
     def post(self):
         jid = self.request.get("jid", None)
         if jid:
-            if get_presence(jid):
-                twsession = getTwSession(jid)
-                if twsession:
-                    message = Message({"from":jid, "to":"tw-bot@appspot.com", "body":"/ft"})
-                    twsession.ftimeline_command(message=message, taskqueue=True)
-                    return
+            try:
+                if get_presence(jid):
+                    twsession = getTwSession(jid)
+                    if twsession:
+                        message = Message({"from":jid, "to":"tw-bot@appspot.com", "body":"/ft"})
+                        twsession.ftimeline_command(message=message, taskqueue=True)
+		return
+            except e:
+	        logging.exception(e)
+	        return
         self.error(500)
 
 def application():
