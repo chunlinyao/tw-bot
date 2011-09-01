@@ -500,7 +500,7 @@ class CronHandler(RequestHandler):
             try:
                 if get_presence(user.jid):
                     taskqueue.add(params={'jid': user.jid})
-            except e:
+            except Exception, e:
                 logging.exception(e)
                 return
         self.redirect('/')
@@ -516,7 +516,7 @@ class QueueHandler(RequestHandler):
                         message = Message({"from":jid, "to":"tw-bot@appspot.com", "body":"/ft"})
                         twsession.ftimeline_command(message=message, taskqueue=True)
 		return
-            except e:
+            except Exception, e:
 	        logging.exception(e)
 	        return
         self.error(500)
