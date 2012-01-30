@@ -265,7 +265,6 @@ class TwSession(object):
             logging.exception(message.command)
             message.reply(":( Error")
 
-
     @checklogin
     @updatecache
     def ftimeline_command(self, message=None, taskqueue=False):
@@ -493,40 +492,88 @@ class ClearCache(RequestHandler):
         return
 
 from google.appengine.api.labs import taskqueue
+def get_onlineusers():
+        onlineusers = memcache.get("onlineusers")
+        if onlineusers is None:
+            onlineusers = {}
+        return onlineusers
 
 class CronHandler(RequestHandler):
     def get(self):
         for user in OAuthToken.all():
             try:
-                if get_presence(user.jid):
+                logging.info(user.jid)
+                onlineusers = get_onlineusers()
+                if get_presence(user.jid) or onlineusers.has_key(user.jid):
+                    twsession = getTwSession(user.jid)
                     taskqueue.add(params={'jid': user.jid})
-            except e:
+            except Exception, e:
                 logging.exception(e)
                 return
-        self.redirect('/')
+        return
 
 class QueueHandler(RequestHandler):
     def post(self):
         jid = self.request.get("jid", None)
         if jid:
             try:
-                if get_presence(jid):
+                logging.info(jid)
+                onlineusers = get_onlineusers()
+                if get_presence(jid) or onlineusers.has_key(jid):
                     twsession = getTwSession(jid)
                     if twsession:
                         message = Message({"from":jid, "to":"tw-bot@appspot.com", "body":"/ft"})
                         twsession.ftimeline_command(message=message, taskqueue=True)
 		return
-            except e:
+            except Exception, e:
 	        logging.exception(e)
 	        return
         self.error(500)
 
+class OnlineHandler(RequestHandler):
+    def post(self):
+        jid = self.request.get("from").split('/')[0]
+        if jid:
+            try:
+                logging.info(jid)
+                onlineusers = get_onlineusers()
+                if onlineusers.has_key(jid):
+                    pass
+                else:
+                    onlineusers[jid] = 1
+                    memcache.set("onlineusers", onlineusers)
+		return
+            except Exception, e:
+	        logging.exception(e)
+	        return
+        self.error(500)
+
+class OfflineHandler(RequestHandler):
+    def post(self):
+        jid = self.request.get("from").split('/')[0]
+        if jid:
+            try:
+                logging.info(jid)
+                twsession = getTwSession(jid)
+                onlineusers = get_onlineusers()
+                if onlineusers.has_key(jid):
+                    del onlineusers[jid] 
+                    memcache.set("onlineusers", onlineusers)
+                else:
+                    pass
+		return
+            except Exception, e:
+	        logging.exception(e)
+	        return
+        self.error(500)
 def application():
     application = webapp.WSGIApplication([
         ('/',Home),
         ('/index.html',Home),
         ('/index.htm',Home),
         ('/_ah/xmpp/message/chat/', XmppHandler),
+        ('/_ah/xmpp/presence/available/', OnlineHandler),
+        ('/_ah/xmpp/presence/unavailable/', OfflineHandler),
         ('/_ah/queue/default', QueueHandler),
         ('/oauth', OAuthHandler),
         ('/clearcache', ClearCache),
