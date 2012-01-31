@@ -566,6 +566,18 @@ class OfflineHandler(RequestHandler):
 	        logging.exception(e)
 	        return
         self.error(500)
+
+class ProbeHandler(RequestHandler):
+    def post(self):
+        jid = self.request.get("from").split('/')[0]
+        if jid:
+            try:
+                logging.info(jid)
+		return
+            except Exception, e:
+	        logging.exception(e)
+	        return
+        self.error(500)
 def application():
     application = webapp.WSGIApplication([
         ('/',Home),
@@ -574,6 +586,7 @@ def application():
         ('/_ah/xmpp/message/chat/', XmppHandler),
         ('/_ah/xmpp/presence/available/', OnlineHandler),
         ('/_ah/xmpp/presence/unavailable/', OfflineHandler),
+        ('/_ah/xmpp/presence/probe/', ProbeHandler),
         ('/_ah/queue/default', QueueHandler),
         ('/oauth', OAuthHandler),
         ('/clearcache', ClearCache),
